@@ -1,0 +1,8 @@
+.eggs
+*.egg-info/
+*.pyc
+*.so
+build/
+dist/
+pyavro_rs/_lowlevel.py
+pyavro_rs/_lowlevel__ffi.py
