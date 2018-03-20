@@ -1,7 +1,13 @@
+from cPickle import dumps
+from cPickle import loads
+from types import NoneType
+
 from pyavro_rs._lowlevel import ffi, lib
 
 
-# TODO: avro_init
+CODEC_NULL = lib.AVRO_CODEC_NULL
+CODEC_DEFLATE = lib.AVRO_CODEC_DEFLATE
+lib.avro_init()
 
 
 class AvroError(Exception):
@@ -11,6 +17,9 @@ class AvroError(Exception):
 
     def __repr__(self):
         return 'AvroError(err={}, message={})'.format(self.err, self.message)
+
+    def __str__(self):
+        return self.__repr__()
 
 
 def rustcall(func, *args):
@@ -38,28 +47,132 @@ def decode_str(s, free=False):
 
 def encode_str(s):
     '''Encodes a AvroStr'''
-    return rustcall(lib.avro_str_from_c_str, ffi.from_buffer(s.encode('utf-8')))
+    return rustcall(lib.avro_str_from_c_str, ffi.from_buffer(s))  # .encode('utf-8')))
 
 
-def parse_schema(schema_str):
-    return rustcall(
-        lib.avro_schema_from_json,
-        ffi.addressof(encode_str(schema_str))
-    )
+def from_bytearray(ba):
+    return bytes(ffi.buffer(ba.data, ba.len)) if ba.data != ffi.NULL else b''
 
 
-def free_schema(schema):
-    return rustcall(
-        lib.avro_schema_free,
-        schema,
-    )
+class RustObject(object):
+    __dealloc_func__ = None
+    __objptr = None
+
+    @classmethod
+    def _from_objptr(cls, ptr):
+        result = object.__new__(cls)
+        result.__objptr = ptr
+        return result
+
+    @property
+    def _objptr(self):
+        if not self.__objptr:
+            raise RuntimeError('Object is closed')
+        return self.__objptr
+
+    def _methodcall(self, func, *args):
+        return rustcall(func, self._objptr, *args)
+
+    def __del__(self):
+        if self.__objptr is None:
+            return
+
+        f = self.__class__.__dealloc_func__
+        if f is not None:
+            rustcall(f, self.__objptr)
+            self.__objptr = None
 
 
-def new_writer(schema):
-    buf = rustcall(lib.avro_byte_array_from_c_array, [], 0)
-    return rustcall(
-        lib.avro_writer_new,
-        schema,
-        ffi.addressof(buf),
-        lib.AVRO_CODEC_NULL,
-    )
+class Schema(RustObject):
+    __dealloc_func__ = lib.avro_schema_free
+
+    def __new__(cls, schema_str):
+        return cls._from_objptr(
+            rustcall(
+                lib.avro_schema_from_json,
+                ffi.addressof(encode_str(schema_str)),
+            )
+        )
+
+
+def avro_null(_):
+    pass
+
+
+def avro_boolean(b):
+    pass
+
+
+def avro_long(n):
+    pass
+
+
+def avro_double(x):
+    pass
+
+
+class Writer(RustObject):
+    __types__ = {
+        NoneType: avro_null,
+        bool: avro_boolean,
+        int: avro_long,
+        float: avro_double,
+        list: 'list',
+        set: 'list',
+        dict: 'map',
+    }
+
+    def __new__(cls, schema, codec=CODEC_NULL):
+        return cls._from_objptr(
+            rustcall(
+                lib.avro_writer_new,
+                schema._objptr,
+                codec,
+            )
+        )
+
+    def append(self, datum):
+        avro_type = self.__types__.get(type(datum))
+        if avro_type is None:
+            raise AvroError(
+                err=1,
+                message='datum type {} not supported'.format(type(datum)),
+            )
+
+        avro_value = avro_type(datum)
+
+        pickled = dumps(datum)
+        buf = rustcall(lib.avro_byte_array_from_c_array, pickled, len(pickled))
+        return self._methodcall(lib.avro_writer_append, ffi.addressof(buf))
+
+    def flush(self):
+        return self._methodcall(lib.avro_writer_flush)
+
+    def into(self):
+        return self._methodcall(lib.avro_writer_into_data)
+
+
+class Reader(RustObject):
+    __dealloc_func__ = lib.avro_reader_free
+
+    def __new__(cls, buf, schema):
+        # b = rustcall(lib.avro_byte_array_from_c_array, buf, len(buf))
+        return cls._from_objptr(
+            rustcall(
+                lib.avro_reader_new,
+                ffi.addressof(buf),
+                schema._objptr,
+            )
+        )
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        item = self._methodcall(lib.avro_reader_read_next)
+        if item.len == 0:
+            raise StopIteration
+        return loads(from_bytearray(item))
+
+    def next(self):
+        return self.__next__()
