@@ -95,33 +95,7 @@ class Schema(RustObject):
         )
 
 
-def avro_null(_):
-    pass
-
-
-def avro_boolean(b):
-    pass
-
-
-def avro_long(n):
-    pass
-
-
-def avro_double(x):
-    pass
-
-
 class Writer(RustObject):
-    __types__ = {
-        NoneType: avro_null,
-        bool: avro_boolean,
-        int: avro_long,
-        float: avro_double,
-        list: 'list',
-        set: 'list',
-        dict: 'map',
-    }
-
     def __new__(cls, schema, codec=CODEC_NULL):
         return cls._from_objptr(
             rustcall(
@@ -132,15 +106,6 @@ class Writer(RustObject):
         )
 
     def append(self, datum):
-        avro_type = self.__types__.get(type(datum))
-        if avro_type is None:
-            raise AvroError(
-                err=1,
-                message='datum type {} not supported'.format(type(datum)),
-            )
-
-        avro_value = avro_type(datum)
-
         pickled = dumps(datum)
         buf = rustcall(lib.avro_byte_array_from_c_array, pickled, len(pickled))
         return self._methodcall(lib.avro_writer_append, ffi.addressof(buf))
