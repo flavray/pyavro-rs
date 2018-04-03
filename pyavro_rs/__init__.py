@@ -114,18 +114,19 @@ class Writer(RustObject):
         return self._methodcall(lib.avro_writer_flush)
 
     def into(self):
-        return self._methodcall(lib.avro_writer_into_data)
+        byte_array = self._methodcall(lib.avro_writer_into_data)
+        return from_bytearray(byte_array)
 
 
 class Reader(RustObject):
     __dealloc_func__ = lib.avro_reader_free
 
     def __new__(cls, buf, schema):
-        # b = rustcall(lib.avro_byte_array_from_c_array, buf, len(buf))
+        byte_array = rustcall(lib.avro_byte_array_from_c_array, buf, len(buf))
         return cls._from_objptr(
             rustcall(
                 lib.avro_reader_new,
-                ffi.addressof(buf),
+                ffi.addressof(byte_array),
                 schema._objptr,
             )
         )
