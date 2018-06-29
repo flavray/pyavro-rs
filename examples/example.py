@@ -14,6 +14,7 @@ writer = Writer(schema)
 print(writer)
 
 writer.append({'field': 'foo'})
+writer.append({'field': 'bar'})
 writer.flush()
 
 output = writer.into()

@@ -95,7 +95,82 @@ class Schema(RustObject):
         )
 
 
+def avro_null(_):
+    return rustcall(lib.avro_value_null_new)
+
+
+def avro_bool(b):
+    return rustcall(lib.avro_value_boolean_new, int(b))
+
+
+def avro_int(n):
+    return rustcall(lib.avro_value_long_new, n)
+
+
+def avro_float(x):
+    return rustcall(lib.avro_value_double_new, x)
+
+
+def avro_str(s):
+    return rustcall(lib.avro_value_string_new, encode_str(s))
+
+
+def avro_bytes(ba):
+    if type(ba) == str:  # thank you python2. type('toto') == str == bytes
+        return avro_str(ba)
+    byte_array = rustcall(lib.avro_byte_array_from_c_array, ba, len(ba))
+    return rustcall(lib.avro_value_bytes_new, byte_array)
+
+
+def avro_list(items):
+    array = lib.avro_value_array_new(len(items))
+    for item in items:
+        value = Value(item)
+        lib.avro_array_append(array, value.value)
+    return array
+
+
+def avro_dict(items):
+    m = lib.avro_value_map_new(len(items))
+    for key, item in items.items():
+        if type(key) != str:
+            raise Exception('Map keys must be string, got {}'.format(type(key)))
+        key_value = encode_str(key)
+        item_value = Value(item)
+        lib.avro_map_put(m, key_value, item_value.value)
+    return m
+
+
+class Value(RustObject):
+    # __dealloc_func__ = lib.avro_value_free  # Values are deallocated on the Rust side
+
+    __TYPE_TO_AVRO = {
+        NoneType: avro_null,
+        bool: avro_bool,
+        int: avro_int,
+        long: avro_int,
+        float: avro_float,
+        str: avro_str,
+        bytes: avro_bytes,
+        list: avro_list,
+        tuple: avro_list,
+        dict: avro_dict,
+    }
+
+    def __new__(cls, datum):
+        fn = cls.__TYPE_TO_AVRO.get(type(datum))
+        if fn is None:
+            raise Exception('Unable to encode type {}'.format(type(datum)))
+        return cls._from_objptr(fn(datum))
+
+    @property
+    def value(self):
+        return self._objptr
+
+
 class Writer(RustObject):
+    # __dealloc_func__ = lib.avro_writer_free  # TODO: this function does not exist
+
     def __new__(cls, schema, codec=CODEC_NULL):
         return cls._from_objptr(
             rustcall(
@@ -105,10 +180,15 @@ class Writer(RustObject):
             )
         )
 
-    def append(self, datum):
+    def _append_old(self, datum):
         pickled = dumps(datum)
         buf = rustcall(lib.avro_byte_array_from_c_array, pickled, len(pickled))
         return self._methodcall(lib.avro_writer_append, ffi.addressof(buf))
+
+    def append(self, datum):
+        value = Value(datum)
+        self._methodcall(lib.avro_writer_append2, value.value)
+        return value
 
     def flush(self):
         return self._methodcall(lib.avro_writer_flush)
