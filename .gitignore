@@ -2,6 +2,7 @@
 *.egg-info/
 *.pyc
 *.so
+.tox/
 build/
 dist/
 pyavro_rs/_lowlevel.py

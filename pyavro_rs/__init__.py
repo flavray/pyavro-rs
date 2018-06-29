@@ -1,10 +1,14 @@
-from cPickle import dumps
-from cPickle import loads
-from types import NoneType
+try:
+    from cPickle import dumps
+    from cPickle import loads
+except ImportError:
+    from pickle import dumps
+    from pickle import loads
 
 from pyavro_rs._lowlevel import ffi, lib
 
 
+NoneType = type(None)
 CODEC_NULL = lib.AVRO_CODEC_NULL
 CODEC_DEFLATE = lib.AVRO_CODEC_DEFLATE
 lib.avro_init()
@@ -47,7 +51,7 @@ def decode_str(s, free=False):
 
 def encode_str(s):
     '''Encodes a AvroStr'''
-    return rustcall(lib.avro_str_from_c_str, ffi.from_buffer(s))  # .encode('utf-8')))
+    return rustcall(lib.avro_str_from_c_str, ffi.from_buffer(s.encode('utf-8')))  # .encode('utf-8')))
 
 
 def from_bytearray(ba):
@@ -148,7 +152,6 @@ class Value(RustObject):
         NoneType: avro_null,
         bool: avro_bool,
         int: avro_int,
-        long: avro_int,
         float: avro_float,
         str: avro_str,
         bytes: avro_bytes,

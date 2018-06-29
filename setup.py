@@ -1,5 +1,6 @@
 from setuptools import setup, find_packages
 
+
 def build_native(spec):
     build = spec.add_external_build(
         cmd=['cargo', 'build', '--release'],
@@ -11,6 +12,7 @@ def build_native(spec):
         header_filename=lambda: build.find_header('avro_rs.h', in_path='include'),
         rtld_flags=['NOW', 'NODELETE']
     )
+
 
 setup(
     name='pyavro_rs',

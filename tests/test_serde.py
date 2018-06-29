@@ -1,5 +1,3 @@
-from pyavro_rs import decode_str
-from pyavro_rs import encode_str
 from pyavro_rs import Reader
 from pyavro_rs import Schema
 from pyavro_rs import Writer

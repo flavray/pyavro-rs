@@ -1,7 +1,6 @@
 import json
 import time
 
-import pyavro_rs
 from pyavro_rs import Reader
 from pyavro_rs import Schema
 from pyavro_rs import Writer

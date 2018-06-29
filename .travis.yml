@@ -1,0 +1,20 @@
+os: linux
+sudo: false
+language: python
+
+python:
+  - "2.7"
+  - "3.6"
+
+install:
+  - pip install tox tox-travis
+  - curl https://sh.rustup.rs -sSf | sh -s -- -y
+  - export PATH="${HOME}/.cargo/bin:${PATH}"
+  - which cargo
+  - which rustc
+
+script:
+  - make test
+
+cache:
+  - pip
