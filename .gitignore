@@ -6,3 +6,5 @@ build/
 dist/
 pyavro_rs/_lowlevel.py
 pyavro_rs/_lowlevel__ffi.py
+virtualenv_run/
+.pytest_cache
