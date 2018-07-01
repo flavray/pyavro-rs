@@ -191,7 +191,6 @@ class Writer(RustObject):
     def append(self, datum):
         value = Value(datum)
         self._methodcall(lib.avro_writer_append2, value.value)
-        return value
 
     def flush(self):
         return self._methodcall(lib.avro_writer_flush)
@@ -225,3 +224,21 @@ class Reader(RustObject):
 
     def next(self):
         return self.__next__()
+
+
+def schemaless_write(schema, datum):
+    value = Value(datum)
+    return rustcall(
+        lib.avro_to_avro_datum,
+        schema._objptr,
+        value.value,
+    )
+
+
+def schemaless_read(schema, buf):
+    ba = rustcall(
+        lib.avro_from_avro_datum,
+        ffi.addressof(buf),
+        schema._objptr,
+    )
+    return loads(from_bytearray(ba))

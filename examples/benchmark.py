@@ -1,9 +1,9 @@
 import json
 import time
 
-from pyavro_rs import Reader
+from pyavro_rs import schemaless_read
+from pyavro_rs import schemaless_write
 from pyavro_rs import Schema
-from pyavro_rs import Writer
 
 
 def write_pyavro_rs(schema, records, runs=1):
@@ -11,21 +11,20 @@ def write_pyavro_rs(schema, records, runs=1):
     for _ in range(runs):
         start = time.time()
 
-        writer = Writer(schema)
         for record in records:
-            writer.append(record)
-        writer.flush()
+            output = schemaless_write(schema, record)
         end = time.time()
-        output = writer.into()
         times.append(end - start)
     return output, sum(times)
 
 
-def read_pyavro_rs(schema, bytes_, runs=1):
+def read_pyavro_rs(schema, bytes_, num_records, runs=1):
     times = []
     for _ in range(runs):
+        records = []
         start = time.time()
-        records = list(Reader(bytes_, schema))
+        for __ in range(num_records):
+            records.append(schemaless_read(schema, bytes_))
         end = time.time()
         times.append(end - start)
     return records, sum(times)
@@ -123,7 +122,7 @@ configurations = [
 for schema, single_record, num_records, num_runs in configurations:
     original_records = [single_record for _ in range(num_records)]
     bytes_, time_w = write_pyavro_rs(schema, original_records, runs=num_runs)
-    records, time_r = read_pyavro_rs(schema, bytes_, runs=num_runs)
+    records, time_r = read_pyavro_rs(schema, bytes_, num_records, runs=num_runs)
 
     assert records == original_records
 
